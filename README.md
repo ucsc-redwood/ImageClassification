@@ -82,3 +82,23 @@ OutPut for Third_maxpool ([1, 256, 1, 1])
 
 Output size after classification: torch.Size([1, 10])
 ```
+
+## Output from Cifar10.cpp
+
+```
+First_conv2d Input: 32x32x3 First_conv2d Output: 8x8x64
+First_ReLU Input: 8x8x64 First_ReLU Output: 8x8x64
+First_maxpool2d Input: 8x8x64 First_maxpool2d Output: 4x4x64
+Second_conv2d Input: 4x4x64 Second_conv2d Output: 4x4x192
+Second_ReLU Input: 4x4x192 Second_ReLU Output: 4x4x192
+Second_maxpool2d Input: 4x4x192 Second_maxpool2d Output: 2x2x192
+Third_conv2d Input: 2x2x192 Third_conv2d Output: 2x2x384
+Third_ReLU Input: 2x2x384 Third_ReLU Output: 2x2x384
+Fourth_conv2d Input: 2x2x384 Fourth_conv2d Output: 2x2x256
+Fourth_ReLU Input: 2x2x256 Fourth_ReLU Output: 2x2x256
+Fifth_conv2d Input: 2x2x256 Fifth_conv2d Output: 2x2x256
+Fifth_ReLU Input: 2x2x256 Fifth_ReLU Output: 2x2x256
+Third_maxpool2d Input: 2x2x256 Third_maxpool2d Output: 1x1x256
+view_flattend Input: 1x1x256 view_flattend Output: 1x256
+Max value: 0.238324 Image class: 4
+```
