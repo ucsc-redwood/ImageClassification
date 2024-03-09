@@ -1,5 +1,6 @@
 # ImageClassification
 
+## Structure of Alexnet Cifar-10
 ```python
 # Define the AlexNet model architecture using PyTorch
 
@@ -37,3 +38,47 @@ class AlexNet(nn.Module):
         return x
 ```
 
+## Input and Output shapes for each layer
+```
+
+Input for First_Conv2d ([1, 3, 32, 32])
+Output for First_Conv2d ([1, 64, 8, 8])
+
+Input for First_ReLU ([1, 64, 8, 8])
+Output for First_ReLU ([1, 64, 8, 8])
+
+Input for First Max_Pool2d ([1, 64, 8, 8])
+Output for First Max_Pool2d ([1, 64, 4, 4])
+
+Input for Second_Conv2d ([1, 64, 4, 4])
+Output for Second_conv2d ([1, 192, 4, 4])
+
+Input for Second_ReLU ([1, 192, 4, 4])
+Output for Second_ReLU ([1, 192, 4, 4])
+
+Input for Second_Maxpool ([1, 192, 4, 4])
+Output for Second_Maxpool ([1, 192, 2, 2])
+
+Input for Third_Conv2d([1, 192, 2, 2])
+OutPut for Third_Conv2d([1, 384, 2, 2])
+
+Input for Third_ReLU ([1, 384, 2, 2])
+Output for Third_Relu ([1, 384, 2, 2])
+
+Input for Fourth_Conv2d ([1, 384, 2, 2])
+Output for Fourth_Conv2d ([1, 256, 2, 2])
+
+Input for Fourth_ReLU ([1, 256, 2, 2])
+OutPut for Fourth_ReLU ([1, 256, 2, 2])
+
+Input for Fifth_Conv2d ([1, 256, 2, 2])
+Output for Fifth_Conv2d ([1, 256, 2, 2])
+
+Input for Fifth_ReLU ([1, 256, 2, 2])
+Output for Fifth_ReLU ([1, 256, 2, 2])
+
+Input for Third_maxPool  ([1, 256, 2, 2])
+OutPut for Third_maxpool ([1, 256, 1, 1])
+
+Output size after classification: torch.Size([1, 10])
+```
