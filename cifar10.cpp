@@ -38,6 +38,18 @@ void First_conv2d(const float input[32][32][3], int input_size,
         }
     }
     cout << "First_conv2d Input: " << input_size << "x" << input_size << "x3" << " " << "First_conv2d Output: " << output_size << "x" << output_size << "x" << 64 << endl;
+    // Print the complete output
+    std::cout << "First_conv2d Output:" << std::endl;
+    for (int out_channel = 0; out_channel < 64; ++out_channel) {
+        std::cout << "Channel " << out_channel << ":" << std::endl;
+        for (int y_out = 0; y_out < output_size; ++y_out) {
+            for (int x_out = 0; x_out < output_size; ++x_out) {
+                std::cout << output[y_out][x_out][out_channel] << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
 }
 
 void First_ReLU(float output[8][8][64], int output_size) {
@@ -378,7 +390,7 @@ int result(float output[10]) {
 
 int main() {
     // Read input image from file
-    ifstream input_file("cifar_image.txt");
+    ifstream input_file("/home/rithik/ImageClassification/images/airplane/airplane_1.txt");
     float input[3][32 * 32]; // Assuming 3 channels and 32x32 pixels
     int input_size = 32; // Size of the image after reshaping
 
@@ -611,6 +623,7 @@ int main() {
 
     // Call conv2d function
     First_conv2d(reshapedInput, 32, kernel1, bias1, 4, 5, conv_output1, conv_output_size1);
+    /*
     First_ReLU(conv_output1, conv_output_size1);
     First_maxpool2d(conv_output1, conv_output_size1, 2, 2, maxpool_output1, maxpool_output_size1);
     Second_conv2d(maxpool_output1, 4, kernel2, bias2, 1, 2, conv_output2, conv_output_size2);
@@ -626,4 +639,5 @@ int main() {
     view_flatten(maxpool_output3, maxpool_output_size3, view_flatten_output, view_flatten_output_size);
     linear(view_flatten_output, kernel6, bias6, classifier_output);
     result(classifier_output);
+    */
 }
