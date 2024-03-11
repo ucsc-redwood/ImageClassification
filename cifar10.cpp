@@ -63,6 +63,16 @@ void First_ReLU(float output[8][8][64], int output_size) {
         }
     }
     cout << "First_ReLU Input: " << output_size << "x" << output_size << "x" << 64 << " " << "First_ReLU Output: " << output_size << "x" << output_size << "x" << 64 << endl;
+    for (int c = 0; c < 64; ++c) {
+	    cout << "Channel " << c << ":\n";
+	    for (int i = 0; i < output_size; ++i) {
+		    for (int j = 0; j < output_size; ++j) {
+			    cout << output[i][j][c] << " ";
+		    }
+		    cout << endl;
+	    }
+	    cout << endl;
+    }
 }
 
 void First_maxpool2d(const float input[8][8][64], int input_size,
@@ -90,6 +100,16 @@ void First_maxpool2d(const float input[8][8][64], int input_size,
         }
     }
     cout << "First_maxpool2d Input: " << input_size << "x" << input_size << "x" << 64 << " " << "First_maxpool2d Output: " << output_size << "x" << output_size << "x" << 64 << endl;
+    // Print output values
+    for (int c = 0; c < 64; ++c) {
+        for (int i = 0; i < output_size; ++i) {
+            for (int j = 0; j < output_size; ++j) {
+                cout << output[i][j][c] << " ";
+            }
+            cout << endl;
+        }
+        cout << endl;
+    }
 }
 
 void Second_conv2d(const float input[4][4][64], int input_size,
@@ -390,7 +410,7 @@ int result(float output[10]) {
 
 int main() {
     // Read input image from file
-    ifstream input_file("/home/rithik/ImageClassification/images/airplane/airplane_1.txt");
+    ifstream input_file("/home/rithik/ImageClassification/images/airplane/image_1.txt");
     float input[3][32 * 32]; // Assuming 3 channels and 32x32 pixels
     int input_size = 32; // Size of the image after reshaping
 
@@ -623,7 +643,6 @@ int main() {
 
     // Call conv2d function
     First_conv2d(reshapedInput, 32, kernel1, bias1, 4, 5, conv_output1, conv_output_size1);
-    /*
     First_ReLU(conv_output1, conv_output_size1);
     First_maxpool2d(conv_output1, conv_output_size1, 2, 2, maxpool_output1, maxpool_output_size1);
     Second_conv2d(maxpool_output1, 4, kernel2, bias2, 1, 2, conv_output2, conv_output_size2);
@@ -639,5 +658,4 @@ int main() {
     view_flatten(maxpool_output3, maxpool_output_size3, view_flatten_output, view_flatten_output_size);
     linear(view_flatten_output, kernel6, bias6, classifier_output);
     result(classifier_output);
-    */
 }

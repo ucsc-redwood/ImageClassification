@@ -53,7 +53,9 @@ def convolution_with_input(input_tensor, weights, bias):
             self.conv.bias = nn.Parameter(bias)
 
         def forward(self, x):
-            return self.conv(x)
+            x = self.conv(x)
+            x = nn.ReLU()(x)  # Adding ReLU activation
+            return x
 
     # Create an instance of the Conv2d model with loaded weights and bias
     conv_model = Conv2dModel(weights, bias)
@@ -64,8 +66,8 @@ def convolution_with_input(input_tensor, weights, bias):
     # Print output shape
     print("Output shape:", output.shape)
 
-    # Save each channel of the output tensor to a separate text file
-    with open("convolution1_pythonresult.txt", "w") as file:
+    # Save ReLU output to a text file
+    with open("relu1_pythonresult.txt", "w") as file:
         for channel in range(output.shape[1]):
             file.write(f"Channel {channel}:\n")
             for i in range(output.shape[2]):
@@ -74,8 +76,8 @@ def convolution_with_input(input_tensor, weights, bias):
                 file.write("\n")
             file.write("\n")
 
-    # Print the shape of the saved file
-    print("Output saved to convolution1.txt")
+    # Print message
+    print("ReLU output saved to relu1_pythonresult.txt")
 
 # Define the path to the text file
 example_input_path = '/home/rithik/ImageClassification/images/airplane/image_1.txt'

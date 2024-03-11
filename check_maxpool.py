@@ -51,9 +51,14 @@ def convolution_with_input(input_tensor, weights, bias):
             self.conv = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=11, stride=4, padding=5)
             self.conv.weight = nn.Parameter(weights)
             self.conv.bias = nn.Parameter(bias)
+            self.relu = nn.ReLU()
+            self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
 
         def forward(self, x):
-            return self.conv(x)
+            x = self.conv(x)
+            x = self.relu(x)  # Adding ReLU activation
+            x = self.maxpool(x)  # Adding MaxPool2d layer
+            return x
 
     # Create an instance of the Conv2d model with loaded weights and bias
     conv_model = Conv2dModel(weights, bias)
@@ -64,8 +69,8 @@ def convolution_with_input(input_tensor, weights, bias):
     # Print output shape
     print("Output shape:", output.shape)
 
-    # Save each channel of the output tensor to a separate text file
-    with open("convolution1_pythonresult.txt", "w") as file:
+    # Save MaxPool2d output to a text file
+    with open("maxpool1_pythonresult.txt", "w") as file:
         for channel in range(output.shape[1]):
             file.write(f"Channel {channel}:\n")
             for i in range(output.shape[2]):
@@ -74,8 +79,8 @@ def convolution_with_input(input_tensor, weights, bias):
                 file.write("\n")
             file.write("\n")
 
-    # Print the shape of the saved file
-    print("Output saved to convolution1.txt")
+    # Print message
+    print("MaxPool2d output saved to maxpool1_pythonresult.txt")
 
 # Define the path to the text file
 example_input_path = '/home/rithik/ImageClassification/images/airplane/image_1.txt'
