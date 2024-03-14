@@ -76,6 +76,10 @@ void conv2d(float* input_data, int image_input_channels, int input_height, int i
     int output_width = (input_width + 2 * padding - kernel_size) / stride + 1;
 
     // Perform convolution
+    // merge loops = 
+    // sparse - 1D threadxblock - parallel in outer most loop
+    // timers for each layer
+    // condensa - focus on conv, csr
     for (int out_channel = 0; out_channel < weight_output_channels; ++out_channel) {
         for (int y = 0; y < output_height; ++y) {
             for (int x = 0; x < output_width; ++x) {
@@ -106,6 +110,7 @@ void conv2d(float* input_data, int image_input_channels, int input_height, int i
     }
 }
 
+// temp memory
 void linearLayer(float* input_data, float* weights, float* bias, float* output_data, int input_size, int output_size) {
     for (int i = 0; i < output_size; ++i) {
         output_data[i] = 0;
@@ -116,7 +121,14 @@ void linearLayer(float* input_data, float* weights, float* bias, float* output_d
     }
 }
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <image_file_path>" << std::endl;
+        return 1;
+    }
+
+    std::string filePath = argv[1];
+
     // Initialize parameters
     int image_input_channels = 3;
     int input_height = 32;  // Assuming a 32x32 image based on the provided data length
@@ -136,7 +148,7 @@ int main() {
     // Load the image data
     int imageDataSize = 3072;
     float* image_data = new float[imageDataSize];
-    readDataFromFile("images/flattened_image_1.txt", image_data, imageDataSize);
+    readDataFromFile(filePath, image_data, imageDataSize);
 
     // Load the weights and data for the first convolutional layer
     int weightDataSize = 1728;
