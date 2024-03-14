@@ -1,661 +1,347 @@
 #include <iostream>
 #include <fstream>
-#include <limits>
-using namespace std;
+#include <algorithm>
+#include <cfloat>
 
-// flatten them to 1D
-// struct maybe?
-// 1D macloocs - GPU
-void First_conv2d(const float input[32][32][3], int input_size,
-            const float kernel[11][11][3][64],
-            const float bias[64], int stride, int padding,
-            float output[8][8][64], int &output_size) {
-    // Validate the kernel size, stride, and padding
-    if (11 > input_size || 11 <= 0 || stride <= 0 || padding < 0) {
+// Function to read data from a text file into a pre-allocated array
+void readDataFromFile(const std::string& filename, float* data, int& dataSize) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Could not open the file - '" << filename << "'" << std::endl;
         return;
     }
 
-    // Calculate the output size considering the stride and padding
-    output_size = (input_size + 2 * padding - 11) / stride + 1;
+    // Count the number of elements in the file to validate against dataSize
+    float value;
+    int count = 0;
+    while (file >> value) {
+        ++count;
+    }
 
-    for (int out_channel = 0; out_channel < 64; ++out_channel) {
-        for (int y_out = 0; y_out < output_size; ++y_out) {
-            for (int x_out = 0; x_out < output_size; ++x_out) {
-                float sum = 0;
-                for (int ky = 0; ky < 11; ++ky) {
-                    for (int kx = 0; kx < 11; ++kx) {
-                        for (int in_channel = 0; in_channel < 3; ++in_channel) {
-                            int input_i = y_out * stride + ky - padding;
-                            int input_j = x_out * stride + kx - padding;
-                            if (input_i >= 0 && input_i < input_size && input_j >= 0 && input_j < input_size) {
-                                sum += input[input_i][input_j][in_channel] * kernel[ky][kx][in_channel][out_channel];
+    if (count != dataSize) {
+        std::cerr << "Data size mismatch. Expected " << dataSize << " elements, but file contains " << count << "." << std::endl;
+        return;
+    }
+
+    // Go back to the beginning of the file
+    file.clear();
+    file.seekg(0, std::ios::beg);
+
+    // Read the data into the array
+    int index = 0;
+    while (file >> value) {
+        data[index++] = value;
+    }
+
+    file.close();
+}
+
+void maxpool2d(float* input_data, int input_channels, int input_height, int input_width,
+               int pool_size, int stride, float* output_data) {
+    // Calculate the dimensions of the output data
+    int output_height = (input_height - pool_size) / stride + 1;
+    int output_width = (input_width - pool_size) / stride + 1;
+
+    // Iterate over each channel
+    for (int c = 0; c < input_channels; c++) {
+        // Iterate over the output height
+        for (int h = 0; h < output_height; h++) {
+            // Iterate over the output width
+            for (int w = 0; w < output_width; w++) {
+                float max_val = -FLT_MAX;
+                // Iterate over the pooling window
+                for (int ph = 0; ph < pool_size; ph++) {
+                    for (int pw = 0; pw < pool_size; pw++) {
+                        int input_h = h * stride + ph;
+                        int input_w = w * stride + pw;
+                        if (input_h < input_height && input_w < input_width) {
+                            int input_index = c * (input_height * input_width) + input_h * input_width + input_w;
+                            max_val = std::max(max_val, input_data[input_index]);
+                        }
+                    }
+                }
+                int output_index = c * (output_height * output_width) + h * output_width + w;
+                output_data[output_index] = max_val;
+            }
+        }
+    }
+}
+
+void conv2d(float* input_data, int image_input_channels, int input_height, int input_width,
+            float* weight_data, int weight_output_channels, int weight_input_channels, int weight_height, int weight_width,
+            float* bias_data, int bias_number_of_elements, int kernel_size, int stride, int padding, 
+            bool relu, float* output_data) {
+    // Compute output dimensions
+    int output_height = (input_height + 2 * padding - kernel_size) / stride + 1;
+    int output_width = (input_width + 2 * padding - kernel_size) / stride + 1;
+
+    // Perform convolution
+    for (int out_channel = 0; out_channel < weight_output_channels; ++out_channel) {
+        for (int y = 0; y < output_height; ++y) {
+            for (int x = 0; x < output_width; ++x) {
+                float sum = 0.0f;
+                for (int in_channel = 0; in_channel < weight_input_channels; ++in_channel) {
+                    for (int ky = 0; ky < weight_height; ++ky) {
+                        for (int kx = 0; kx < weight_width; ++kx) {
+                            int image_y = y * stride + ky - padding;
+                            int image_x = x * stride + kx - padding;
+                            if (image_y >= 0 && image_y < input_height && image_x >= 0 && image_x < input_width) {
+                                int file_index = ((in_channel * input_height + image_y) * input_width + image_x);
+                                int weight_index = ((((out_channel * weight_input_channels) + in_channel) * weight_height + ky) * weight_width + kx);
+                                sum += input_data[file_index] * weight_data[weight_index];
                             }
                         }
                     }
                 }
-                output[y_out][x_out][out_channel] = sum + bias[out_channel];
+                // Add bias
+                if (bias_data && out_channel < bias_number_of_elements)
+                    sum += bias_data[out_channel];
+                // Apply ReLU if needed
+                if (relu && sum < 0)
+                    sum = 0.0f;
+                // Store result
+                output_data[(out_channel * output_height + y) * output_width + x] = sum;
             }
         }
     }
-    cout << "First_conv2d Input: " << input_size << "x" << input_size << "x3" << " " << "First_conv2d Output: " << output_size << "x" << output_size << "x" << 64 << endl;
-    // Print the complete output
-    std::cout << "First_conv2d Output:" << std::endl;
-    for (int out_channel = 0; out_channel < 64; ++out_channel) {
-        std::cout << "Channel " << out_channel << ":" << std::endl;
-        for (int y_out = 0; y_out < output_size; ++y_out) {
-            for (int x_out = 0; x_out < output_size; ++x_out) {
-                std::cout << output[y_out][x_out][out_channel] << " ";
+}
+
+void linearLayer(float* input_data, float* weights, float* bias, float* output_data, int input_size, int output_size) {
+    for (int i = 0; i < output_size; ++i) {
+        output_data[i] = 0;
+        for (int j = 0; j < input_size; ++j) {
+            output_data[i] += input_data[j] * weights[i * input_size + j];
+        }
+        output_data[i] += bias[i];
+    }
+}
+
+int main() {
+    // Initialize parameters
+    int image_input_channels = 3;
+    int input_height = 32;  // Assuming a 32x32 image based on the provided data length
+    int input_width = 32;
+    int weight_output_channels = 64;
+    int weight_input_channels = 3;
+    int weight_height = 3;
+    int weight_width = 3;
+    int bias_number_of_elements = 64;
+    int kernel_size = 3;
+    int stride = 1;
+    int padding = 1;
+    int pool_size = 2;  // Max pool window size
+    int pool_stride = 2;  // Stride for max pooling
+    bool relu = true;
+
+    // Load the image data
+    int imageDataSize = 3072;
+    float* image_data = new float[imageDataSize];
+    readDataFromFile("images/flattened_image_tensor.txt", image_data, imageDataSize);
+
+    // Load the weights and data for the first convolutional layer
+    int weightDataSize = 1728;
+    float* weight_data = new float[weightDataSize];
+    readDataFromFile("data/features_0_weight.txt", weight_data, weightDataSize);
+    int biasDataSize = 64;
+    float* bias_data = new float[biasDataSize];
+    readDataFromFile("data/features_0_bias.txt", bias_data, biasDataSize);
+
+    // Load the weights and data for the second convolutional layer
+    int secondWeightDataSize = 110592;
+    float* second_weight_data = new float[secondWeightDataSize];
+    readDataFromFile("data/features_3_weight.txt", second_weight_data, secondWeightDataSize);
+    int secondBiasDataSize = 192;
+    float* second_bias_data = new float[secondBiasDataSize];
+    readDataFromFile("data/features_3_bias.txt", second_bias_data, secondBiasDataSize);
+
+    // Load weights and biases for the third convolutional layer
+    int thirdWeightDataSize = 663552;
+    float* third_weight_data = new float[thirdWeightDataSize];
+    readDataFromFile("data/features_6_weight.txt", third_weight_data, thirdWeightDataSize);
+    int thirdBiasDataSize = 384;
+    float* third_bias_data = new float[thirdBiasDataSize];
+    readDataFromFile("data/features_6_bias.txt", third_bias_data, thirdBiasDataSize);
+
+    // Load weights and biases for the fourth convolutional layer
+    int fourthWeightDataSize = 884736;
+    float* fourth_weight_data = new float[fourthWeightDataSize];
+    readDataFromFile("data/features_8_weight.txt", fourth_weight_data, fourthWeightDataSize);
+    int fourthBiasDataSize = 256;
+    float* fourth_bias_data = new float[fourthBiasDataSize];
+    readDataFromFile("data/features_8_bias.txt", fourth_bias_data, fourthBiasDataSize);
+
+    // Load weights and biases for the fifth convolutional layer
+    int fifthWeightDataSize = 589824;
+    float* fifth_weight_data = new float[fifthWeightDataSize];
+    readDataFromFile("data/features_10_weight.txt", fifth_weight_data, fifthWeightDataSize);
+    int fifthBiasDataSize = 256;
+    float* fifth_bias_data = new float[fifthBiasDataSize];
+    readDataFromFile("data/features_10_bias.txt", fifth_bias_data, fifthBiasDataSize);
+
+    // Load the weights and bias for the linear layer
+    int linearWeightSize = 40960;
+    float* linear_weight_data = new float[linearWeightSize];
+    readDataFromFile("data/classifier_weight.txt", linear_weight_data, linearWeightSize);
+    int linearBiasSize = 10;
+    float* linear_bias_data = new float[linearBiasSize];
+    readDataFromFile("data/classifier_bias.txt", linear_bias_data, linearBiasSize);
+
+    // Allocate memory for convolution output
+    int conv_output_height = (input_height + 2 * padding - kernel_size) / stride + 1;
+    int conv_output_width = (input_width + 2 * padding - kernel_size) / stride + 1;
+    float* conv_output_data = new float[weight_output_channels * conv_output_height * conv_output_width];
+
+    // Call the convolution function
+    conv2d(image_data, image_input_channels, input_height, input_width,
+           weight_data, weight_output_channels, weight_input_channels, weight_height, weight_width,
+           bias_data, bias_number_of_elements, kernel_size, stride, padding, relu, conv_output_data);
+
+    // Allocate memory for max pooling output
+    int pooled_output_height = (conv_output_height - pool_size) / pool_stride + 1;
+    int pooled_output_width = (conv_output_width - pool_size) / pool_stride + 1;
+    float* maxpool_output_data = new float[weight_output_channels * pooled_output_height * pooled_output_width];
+
+    // Apply max pooling on the convolution output
+    maxpool2d(conv_output_data, weight_output_channels, conv_output_height, conv_output_width, pool_size, pool_stride, maxpool_output_data);
+
+    // Allocate memory for the output of the second convolutional layer
+    int second_conv_output_height = pooled_output_height;
+    int second_conv_output_width = pooled_output_width;
+    float* second_conv_output_data = new float[192 * second_conv_output_height * second_conv_output_width];
+
+    // Call the convolution function for the second layer
+    conv2d(maxpool_output_data, 64, pooled_output_height, pooled_output_width,
+           second_weight_data, 192, 64, 3, 3, 
+           second_bias_data, 192, 3, 1, 1,
+           true, second_conv_output_data);
+
+    // Allocate memory for the output of the second max pooling layer
+    int second_pooled_output_height = (second_conv_output_height - pool_size) / pool_stride + 1;
+    int second_pooled_output_width = (second_conv_output_width - pool_size) / pool_stride + 1;
+    float* second_maxpool_output_data = new float[192 * second_pooled_output_height * second_pooled_output_width];
+
+    // Apply the second max pooling on the second convolution output
+    maxpool2d(second_conv_output_data, 192, second_conv_output_height, second_conv_output_width, pool_size, pool_stride, second_maxpool_output_data);
+
+    // Allocate memory for the output of the third convolutional layer
+    int third_conv_output_height = second_pooled_output_height;
+    int third_conv_output_width = second_pooled_output_width;
+    float* third_conv_output_data = new float[384 * third_conv_output_height * third_conv_output_width];
+
+    // Apply the third convolution
+    conv2d(second_maxpool_output_data, 192, second_pooled_output_height, second_pooled_output_width,
+           third_weight_data, 384, 192, 3, 3,
+           third_bias_data, 384, 3, 1, 1,
+           true, third_conv_output_data);
+
+    // Allocate memory for the output of the fourth convolutional layer
+    int fourth_conv_output_channels = 256;  // Set the number of output channels for the fourth layer
+    int fourth_conv_output_height = third_conv_output_height;
+    int fourth_conv_output_width = third_conv_output_width;
+    float* fourth_conv_output_data = new float[fourth_conv_output_channels * fourth_conv_output_height * fourth_conv_output_width];
+
+    // Call the convolution function for the fourth layer
+    conv2d(third_conv_output_data, 384, third_conv_output_height, third_conv_output_width,
+           fourth_weight_data, fourth_conv_output_channels, 384, 3, 3,
+           fourth_bias_data, fourth_conv_output_channels, 3, 1, 1,
+           true, fourth_conv_output_data);
+
+    // Allocate memory for the output of the fifth convolutional layer
+    int fifth_conv_output_channels = 256;
+    int fifth_conv_output_height = fourth_conv_output_height;
+    int fifth_conv_output_width = fourth_conv_output_width;
+    float* fifth_conv_output_data = new float[fifth_conv_output_channels * fifth_conv_output_height * fifth_conv_output_width];
+
+    // Apply the fifth convolution
+    conv2d(fourth_conv_output_data, 256, fourth_conv_output_height, fourth_conv_output_width,
+           fifth_weight_data, fifth_conv_output_channels, 256, 3, 3,
+           fifth_bias_data, fifth_conv_output_channels, 3, 1, 1,
+           true, fifth_conv_output_data);
+
+    // Define parameters for the max pooling layer after the fifth convolution
+    int pool_size_after_fifth = 2;  // Assuming a 2x2 pooling window
+    int pool_stride_after_fifth = 2;  // Assuming a stride of 2
+
+    // Calculate the output dimensions for the max pooling layer
+    int fifth_pooled_output_height = (fifth_conv_output_height - pool_size_after_fifth) / pool_stride_after_fifth + 1;
+    int fifth_pooled_output_width = (fifth_conv_output_width - pool_size_after_fifth) / pool_stride_after_fifth + 1;
+
+    // Allocate memory for the output of the max pooling layer
+    float* fifth_maxpool_output_data = new float[fifth_conv_output_channels * fifth_pooled_output_height * fifth_pooled_output_width];
+
+    // Apply max pooling on the fifth convolution output
+    maxpool2d(fifth_conv_output_data, fifth_conv_output_channels, fifth_conv_output_height, fifth_conv_output_width,
+              pool_size_after_fifth, pool_stride_after_fifth, fifth_maxpool_output_data);
+
+    // After the third max pooling layer, flatten the output
+    int totalElements = fifth_conv_output_channels * fifth_pooled_output_height * fifth_pooled_output_width;
+    float* flattened_output = new float[totalElements];
+
+    int index = 0;
+    for (int c = 0; c < fifth_conv_output_channels; ++c) {
+        for (int h = 0; h < fifth_pooled_output_height; ++h) {
+            for (int w = 0; w < fifth_pooled_output_width; ++w) {
+                flattened_output[index++] = fifth_maxpool_output_data[(c * fifth_pooled_output_height + h) * fifth_pooled_output_width + w];
+            }
+        }
+    }
+
+    // Define the output size for the linear layer
+    int linear_output_size = 10;  // Since the bias size is 10
+    float* linear_output_data = new float[linear_output_size];
+
+    // Call the linear layer function
+    linearLayer(flattened_output, linear_weight_data, linear_bias_data, linear_output_data, totalElements, linear_output_size);
+
+    // Print the output from the linear layer
+    std::cout << "Output after the linear layer:" << std::endl;
+    for (int i = 0; i < linear_output_size; ++i) {
+        std::cout << linear_output_data[i] << " ";
+    }
+    std::cout << std::endl;
+
+    /*
+    // Print the flattened output
+    std::cout << "Flattened output after the third max pooling:" << std::endl;
+    for (int i = 0; i < totalElements; ++i) {
+        std::cout << flattened_output[i] << " ";
+    }
+    std::cout << std::endl;
+    */
+   
+    /*
+    // Output the result after the max pooling layer
+    std::cout << "Output after the max pooling layer following the fifth convolutional layer:" << std::endl;
+    for (int c = 0; c < fifth_conv_output_channels; ++c) {
+        std::cout << "Channel " << c + 1 << ":" << std::endl;
+        for (int i = 0; i < fifth_pooled_output_height; ++i) {
+            for (int j = 0; j < fifth_pooled_output_width; ++j) {
+                std::cout << fifth_maxpool_output_data[(c * fifth_pooled_output_height + i) * fifth_pooled_output_width + j] << " ";
             }
             std::cout << std::endl;
         }
         std::cout << std::endl;
-    }
-}
+    }*/
 
-void First_ReLU(float output[8][8][64], int output_size) {
-    for (int c = 0; c < 64; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                if (output[i][j][c] < 0) {
-                    output[i][j][c] = 0; // Replace negative values with zero
-                }
-            }
-        }
-    }
-    cout << "First_ReLU Input: " << output_size << "x" << output_size << "x" << 64 << " " << "First_ReLU Output: " << output_size << "x" << output_size << "x" << 64 << endl;
-    for (int c = 0; c < 64; ++c) {
-	    cout << "Channel " << c << ":\n";
-	    for (int i = 0; i < output_size; ++i) {
-		    for (int j = 0; j < output_size; ++j) {
-			    cout << output[i][j][c] << " ";
-		    }
-		    cout << endl;
-	    }
-	    cout << endl;
-    }
-}
+    // Free allocated memory
+    delete[] image_data;
+    delete[] weight_data;
+    delete[] bias_data;
+    delete[] conv_output_data;
+    delete[] maxpool_output_data;
+    delete[] second_weight_data;
+    delete[] second_bias_data;
+    delete[] second_conv_output_data;
+    delete[] second_maxpool_output_data;
+    delete[] third_weight_data;
+    delete[] third_bias_data;
+    delete[] fourth_weight_data;
+    delete[] fourth_bias_data;
+    delete[] fourth_conv_output_data;
+    delete[] fifth_weight_data;
+    delete[] fifth_bias_data;
+    delete[] fifth_conv_output_data;
+    delete[] flattened_output;
 
-void First_maxpool2d(const float input[8][8][64], int input_size,
-               int pool_size, int stride, float output[4][4][64], int &output_size) {
-    // Correct calculation of output_size
-    output_size = (input_size - pool_size) / stride + 1;
-
-    for (int c = 0; c < 64; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                // Initialize max_val to the minimum possible value
-                float max_val = std::numeric_limits<float>::lowest();
-                for (int m = 0; m < pool_size; ++m) {
-                    for (int n = 0; n < pool_size; ++n) {
-                        int idx_row = i * stride + m;
-                        int idx_col = j * stride + n;
-                        // Check if indices are within bounds
-                        if (idx_row < input_size && idx_col < input_size) {
-                            max_val = std::max(max_val, input[idx_row][idx_col][c]);
-                        }
-                    }
-                }
-                output[i][j][c] = max_val;
-            }
-        }
-    }
-    cout << "First_maxpool2d Input: " << input_size << "x" << input_size << "x" << 64 << " " << "First_maxpool2d Output: " << output_size << "x" << output_size << "x" << 64 << endl;
-    // Print output values
-    for (int c = 0; c < 64; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                cout << output[i][j][c] << " ";
-            }
-            cout << endl;
-        }
-        cout << endl;
-    }
-}
-
-void Second_conv2d(const float input[4][4][64], int input_size,
-            const float kernel[5][5][64][192],
-            const float bias[192], int stride, int padding,
-            float output[4][4][192], int &output_size) {
-    // Validate the kernel size, stride, and padding
-/*
-    if (5 > input_size || 5 <= 0 || stride <= 0 || padding < 0) {
-        std::cout << "Second_conv2d: Invalid kernel size, stride, or padding." << std::endl << endl;
-        return;
-    }
-*/
-    // Calculate the output size considering the stride and padding
-    output_size = (input_size + 2 * padding - 5) / stride + 1;
-
-    for (int out_channel = 0; out_channel < 192; ++out_channel) {
-        for (int y_out = 0; y_out < output_size; ++y_out) {
-            for (int x_out = 0; x_out < output_size; ++x_out) {
-                float sum = 0;
-                for (int ky = 0; ky < 5; ++ky) {
-                    for (int kx = 0; kx < 5; ++kx) {
-                        for (int in_channel = 0; in_channel < 64; ++in_channel) {
-                            int input_i = y_out * stride + ky - padding;
-                            int input_j = x_out * stride + kx - padding;
-                            if (input_i >= 0 && input_i < input_size && input_j >= 0 && input_j < input_size) {
-                                sum += input[input_i][input_j][in_channel] * kernel[ky][kx][in_channel][out_channel];
-                            }
-                        }
-                    }
-                }
-                output[y_out][x_out][out_channel] = sum + bias[out_channel];
-            }
-        }
-    }
-    std::cout << "Second_conv2d Input: " << input_size << "x" << input_size << "x64" << " " << "Second_conv2d Output: " << output_size << "x" << output_size << "x" << 192 << std::endl;
-}
-
-void Second_ReLU(float output[4][4][192], int output_size) {
-    for (int c = 0; c < 192; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                if (output[i][j][c] < 0) {
-                    output[i][j][c] = 0; // Replace negative values with zero
-                }
-            }
-        }
-    }
-    cout << "Second_ReLU Input: " << output_size << "x" << output_size << "x" << 192 << " " << "Second_ReLU Output: " << output_size << "x" << output_size << "x" << 192 << endl;
-}
-
-void Second_maxpool2d(const float input[4][4][192], int input_size,
-               int pool_size, int stride, float output[2][2][192], int &output_size) {
-    // Correct calculation of output_size
-    output_size = (input_size - pool_size) / stride + 1;
-
-    for (int c = 0; c < 192; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                // Initialize max_val to the minimum possible value
-                float max_val = std::numeric_limits<float>::lowest();
-                for (int m = 0; m < pool_size; ++m) {
-                    for (int n = 0; n < pool_size; ++n) {
-                        int idx_row = i * stride + m;
-                        int idx_col = j * stride + n;
-                        // Check if indices are within bounds
-                        if (idx_row < input_size && idx_col < input_size) {
-                            max_val = std::max(max_val, input[idx_row][idx_col][c]);
-                        }
-                    }
-                }
-                output[i][j][c] = max_val;
-            }
-        }
-    }
-    cout << "Second_maxpool2d Input: " << input_size << "x" << input_size << "x" << 192 << " " << "Second_maxpool2d Output: " << output_size << "x" << output_size << "x" << 192 << endl;
-}
-
-void Third_conv2d(const float input[2][2][192], int input_size,
-                  const float kernel[3][3][192][384],
-                  const float bias[384], int stride, int padding,
-                  float output[2][2][384], int &output_size) {
-/*
-    // Validate the kernel size, stride, and padding
-    if (3 > input_size || 3 <= 0 || stride <= 0 || padding < 0) {
-        std::cout << "Invalid kernel size, stride, or padding." << std::endl;
-        return;
-    }
-*/
-    // Calculate the output size considering the stride and padding
-    output_size = (input_size + 2 * padding - 3) / stride + 1;
-
-    for (int out_channel = 0; out_channel < 384; ++out_channel) {
-        for (int y_out = 0; y_out < output_size; ++y_out) {
-            for (int x_out = 0; x_out < output_size; ++x_out) {
-                float sum = 0;
-                for (int ky = 0; ky < 3; ++ky) {
-                    for (int kx = 0; kx < 3; ++kx) {
-                        for (int in_channel = 0; in_channel < 192; ++in_channel) {
-                            int input_i = y_out * stride + ky - padding;
-                            int input_j = x_out * stride + kx - padding;
-                            if (input_i >= 0 && input_i < input_size && input_j >= 0 && input_j < input_size) {
-                                sum += input[input_i][input_j][in_channel] * kernel[ky][kx][in_channel][out_channel];
-                            }
-                        }
-                    }
-                }
-                output[y_out][x_out][out_channel] = sum + bias[out_channel];
-            }
-        }
-    }
-    std::cout << "Third_conv2d Input: " << input_size << "x" << input_size << "x192" << " " << "Third_conv2d Output: " << output_size << "x" << output_size << "x" << 384 << std::endl;
-}
-
-void Third_ReLU(float output[2][2][384], int output_size) {
-    for (int c = 0; c < 384; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                if (output[i][j][c] < 0) {
-                    output[i][j][c] = 0; // Replace negative values with zero
-                }
-            }
-        }
-    }
-    cout << "Third_ReLU Input: " << output_size << "x" << output_size << "x" << 384 << " " << "Third_ReLU Output: " << output_size << "x" << output_size << "x" << 384 << endl;
-}
-
-void Fourth_conv2d(const float input[2][2][384], int input_size,
-                   const float kernel[3][3][384][256],
-                   const float bias[256], int stride, int padding,
-                   float output[2][2][256], int &output_size) {
-    // Validate the kernel size, stride, and padding
-/*
-    if (3 > input_size || 3 <= 0 || stride <= 0 || padding < 0) {
-        std::cout << "Invalid kernel size, stride, or padding." << std::endl;
-        return;
-    }
-*/
-    // Calculate the output size considering the stride and padding
-    output_size = (input_size + 2 * padding - 3) / stride + 1;
-
-    for (int out_channel = 0; out_channel < 256; ++out_channel) {
-        for (int y_out = 0; y_out < output_size; ++y_out) {
-            for (int x_out = 0; x_out < output_size; ++x_out) {
-                float sum = 0;
-                for (int ky = 0; ky < 3; ++ky) {
-                    for (int kx = 0; kx < 3; ++kx) {
-                        for (int in_channel = 0; in_channel < 384; ++in_channel) {
-                            int input_i = y_out * stride + ky - padding;
-                            int input_j = x_out * stride + kx - padding;
-                            if (input_i >= 0 && input_i < input_size && input_j >= 0 && input_j < input_size) {
-                                sum += input[input_i][input_j][in_channel] * kernel[ky][kx][in_channel][out_channel];
-                            }
-                        }
-                    }
-                }
-                output[y_out][x_out][out_channel] = sum + bias[out_channel];
-            }
-        }
-    }
-    std::cout << "Fourth_conv2d Input: " << input_size << "x" << input_size << "x384" << " " << "Fourth_conv2d Output: " << output_size << "x" << output_size << "x" << 256 << std::endl;
-}
-
-void Fourth_ReLU(float output[2][2][256], int output_size) {
-    for (int c = 0; c < 256; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                if (output[i][j][c] < 0) {
-                    output[i][j][c] = 0; // Replace negative values with zero
-                }
-            }
-        }
-    }
-    cout << "Fourth_ReLU Input: " << output_size << "x" << output_size << "x" << 256 << " " << "Fourth_ReLU Output: " << output_size << "x" << output_size << "x" << 256 << endl;
-}
-
-void Fifth_conv2d(const float input[2][2][256], int input_size,
-                   const float kernel[3][3][256][256],
-                   const float bias[256], int stride, int padding,
-                   float output[2][2][256], int &output_size) {
-    // Validate the kernel size, stride, and padding
-/*
-    if (3 > input_size || 3 <= 0 || stride <= 0 || padding < 0) {
-        std::cout << "Invalid kernel size, stride, or padding." << std::endl;
-        return;
-    }
-*/
-    // Calculate the output size considering the stride and padding
-    output_size = (input_size + 2 * padding - 3) / stride + 1;
-
-    for (int out_channel = 0; out_channel < 256; ++out_channel) {
-        for (int y_out = 0; y_out < output_size; ++y_out) {
-            for (int x_out = 0; x_out < output_size; ++x_out) {
-                float sum = 0;
-                for (int ky = 0; ky < 3; ++ky) {
-                    for (int kx = 0; kx < 3; ++kx) {
-                        for (int in_channel = 0; in_channel < 256; ++in_channel) {
-                            int input_i = y_out * stride + ky - padding;
-                            int input_j = x_out * stride + kx - padding;
-                            if (input_i >= 0 && input_i < input_size && input_j >= 0 && input_j < input_size) {
-                                sum += input[input_i][input_j][in_channel] * kernel[ky][kx][in_channel][out_channel];
-                            }
-                        }
-                    }
-                }
-                output[y_out][x_out][out_channel] = sum + bias[out_channel];
-            }
-        }
-    }
-    std::cout << "Fifth_conv2d Input: " << input_size << "x" << input_size << "x256" << " " << "Fifth_conv2d Output: " << output_size << "x" << output_size << "x" << 256 << std::endl;
-}
-
-void Fifth_ReLU(float output[2][2][256], int output_size) {
-    for (int c = 0; c < 256; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                if (output[i][j][c] < 0) {
-                    output[i][j][c] = 0; // Replace negative values with zero
-                }
-            }
-        }
-    }
-    cout << "Fifth_ReLU Input: " << output_size << "x" << output_size << "x" << 256 << " " << "Fifth_ReLU Output: " << output_size << "x" << output_size << "x" << 256 << endl;
-}
-
-void Third_maxpool2d(const float input[2][2][256], int input_size,
-               int pool_size, int stride, float output[1][1][256], int &output_size) {
-    // Correct calculation of output_size
-    output_size = (input_size - pool_size) / stride + 1;
-
-    for (int c = 0; c < 256; ++c) {
-        for (int i = 0; i < output_size; ++i) {
-            for (int j = 0; j < output_size; ++j) {
-                // Initialize max_val to the minimum possible value
-                float max_val = std::numeric_limits<float>::lowest();
-                for (int m = 0; m < pool_size; ++m) {
-                    for (int n = 0; n < pool_size; ++n) {
-                        int idx_row = i * stride + m;
-                        int idx_col = j * stride + n;
-                        // Check if indices are within bounds
-                        if (idx_row < input_size && idx_col < input_size) {
-                            max_val = std::max(max_val, input[idx_row][idx_col][c]);
-                        }
-                    }
-                }
-                output[i][j][c] = max_val;
-            }
-        }
-    }
-    cout << "Third_maxpool2d Input: " << input_size << "x" << input_size << "x" << 256 << " " << "Third_maxpool2d Output: " << output_size << "x" << output_size << "x" << 256 << endl;
-}
-
-void view_flatten(const float input[1][1][256], int input_size, float  output[1][256], int output_size) {
-    for (int i = 0; i < 1; ++i) {
-        for (int j = 0; j < 256; ++j) {
-            output[i][j] = input[i][0][j];
-        }
-    }
-    cout << "view_flattend Input: " << input_size << "x" << input_size << "x" << 256 << " " << "view_flattend Output: " << output_size << "x" << 256 << endl;
-}
-
-void linear(const float input[1][256], const float kernel[10][256], const float bias[10], float output[10]) {
-    for (int i = 0; i < 10; ++i) {
-        output[i] = 0;
-        for (int j = 0; j < 256; ++j) {
-            output[i] += input[0][j] * kernel[i][j];
-        }
-        output[i] += bias[i];
-    }
-}
-
-void reshapeInput(float input[3][32 * 32], float reshapedInput[32][32][3]) {
-    for (int c = 0; c < 3; ++c) {
-        for (int h = 0; h < 32; ++h) {
-            for (int w = 0; w < 32; ++w) {
-                reshapedInput[h][w][c] = input[c][h * 32 + w];
-            }
-        }
-    }
-}
-
-
-int result(float output[10]) {
-    float max = output[0]; // Assume the first element as max initially
-    int index = 0;
-
-    // Iterate through the array to find the maximum value
-    for (int i = 1; i < 10; i++) {
-        if (output[i] > max) {
-	    index = i;
-            max = output[i];
-        }
-    }
-
-    cout<<"Max value: " << max << " " << "Image class: " << index << endl;
     return 0;
-}
-
-int main() {
-    // Read input image from file
-    ifstream input_file("/home/rithik/ImageClassification/images/airplane/image_1.txt");
-    float input[3][32 * 32]; // Assuming 3 channels and 32x32 pixels
-    int input_size = 32; // Size of the image after reshaping
-
-    // Read image data from file
-    for (int c = 0; c < 3; ++c) {
-        for (int i = 0; i < 32 * 32; ++i) {
-            input_file >> input[c][i];
-        }
-    }
-    input_file.close();
-
-    // Reshape input to 3 channels of 32x32 pixels
-    float reshapedInput[32][32][3];
-    reshapeInput(input, reshapedInput);
-
-//--------------------LAYER ONE CONV INPUTS------------------------//
-    // Read kernel weights from file
-    ifstream weight_file1("data/features_0_weight.txt");
-    float kernel1[11][11][3][64];
-
-    for (int out_channel = 0; out_channel < 64; ++out_channel) {
-        for (int in_channel = 0; in_channel < 3; ++in_channel) {
-            for (int i = 0; i < 11; ++i) {
-                for (int j = 0; j < 11; ++j) {
-                    weight_file1 >> kernel1[i][j][in_channel][out_channel];
-                }
-            }
-        }
-    }
-    weight_file1.close();
-
-    // Read bias from file
-    ifstream bias_file1("data/features_0_bias.txt");
-    float bias1[64];
-    for (int i = 0; i < 64; ++i) {
-        bias_file1 >> bias1[i];
-    }
-    bias_file1.close();
-
-//--------------------LAYER TWO CONV INPUTS-----------------------//
-// Read kernel weights from file
-    ifstream weight_file2("data/features_3_weight.txt");
-    float kernel2[5][5][64][192];
-
-    // Read kernel weights from file
-    for (int out_channel = 0; out_channel < 192; ++out_channel) {
-        for (int in_channel = 0; in_channel < 64; ++in_channel) {
-            for (int i = 0; i < 5; ++i) {
-                for (int j = 0; j < 5; ++j) {
-                    weight_file2 >> kernel2[i][j][in_channel][out_channel];
-                }
-            }
-        }
-    }
-    weight_file2.close();
-
-    // Read bias from file
-    ifstream bias_file2("data/features_3_bias.txt");
-    float bias2[192];
-
-    for (int i = 0; i < 192; ++i) {
-        bias_file2 >> bias2[i];
-    }
-    bias_file2.close();
-
-//--------------------LAYER THREE CONV INPUTS---------------------//
-    // Read kernel weights from file
-    ifstream weight_file3("data/features_6_weight.txt");
-    float kernel3[3][3][192][384];
-
-    // Read kernel weights from file
-    for (int out_channel = 0; out_channel < 384; ++out_channel) {
-        for (int in_channel = 0; in_channel < 192; ++in_channel) {
-            for (int i = 0; i < 3; ++i) {
-                for (int j = 0; j < 3; ++j) {
-                    weight_file3 >> kernel3[i][j][in_channel][out_channel];
-                }
-            }
-        }
-    }
-    weight_file3.close();
-
-    // Read bias from file
-    ifstream bias_file3("data/features_6_bias.txt");
-    float bias3[384];
-
-    for (int i = 0; i < 384; ++i) {
-        bias_file3 >> bias3[i];
-    }
-    bias_file3.close();
-
-//--------------------LAYER FOUR CONV INPUTS---------------------//
-
-    ifstream weight_file4("data/features_8_weight.txt");
-    float* kernel4 =(float*) malloc(3*3*384*256*sizeof(float));
-    
-    if (!weight_file4.is_open()) {
-    cout << "Failed to open file." << endl;
-    }
-    
-    int count =0;
-    // Read kernel weights from file
-    for (int out_channel = 0; out_channel < 256; ++out_channel) {
-        for (int in_channel = 0; in_channel < 384; ++in_channel) {
-            for (int i = 0; i < 3; ++i) {
-                for (int j = 0; j < 3; ++j) {
-			weight_file4 >> kernel4[out_channel]; // Note the order of indices
-                }
-            }
-        }
-    }
-
-    weight_file4.close();
-
-    // Read bias from file
-    ifstream bias_file4("data/features_8_bias.txt");
-    float bias4[256];
-
-    for (int i = 0; i < 256; ++i) {
-        bias_file4 >> bias4[i];
-    }
-    bias_file4.close();
-
-//--------------------LAYER FIFTH CONV INPUTS---------------------//
-
-    ifstream weight_file5("data/features_10_weight.txt");
-    float* kernel5 =(float*) malloc(3*3*256*256*sizeof(float));
-
-    // Read kernel weights from file
-    for (int out_channel = 0; out_channel < 256; ++out_channel) {
-        for (int in_channel = 0; in_channel < 256; ++in_channel) {
-            for (int i = 0; i < 3; ++i) {
-                for (int j = 0; j < 3; ++j) {
-                        weight_file5 >> kernel5[out_channel]; // Note the order of indices
-                }
-            }
-        }
-    }
-
-    weight_file5.close();
-
-    // Read bias from file
-    ifstream bias_file5("data/features_8_bias.txt");
-    float bias5[256];
-
-    for (int i = 0; i < 256; ++i) {
-        bias_file5 >> bias5[i];
-    }
-    bias_file5.close();
-
-//--------------------LAYER CLASSIFIER INPUTS---------------------//
-
-    // Declare and open the weight file
-    std::ifstream weight_file6("data/classifier_weight.txt");
-    if (!weight_file6) {
-        std::cerr << "Failed to open classifier_weight.txt" << std::endl;
-        return 1;  // Return with error code
-    }
-
-    // Allocate memory for the large kernel
-    float* kernel_large = new float[10 * 12544];
-
-    // Load kernel weights from the file
-    for (int i = 0; i < 10 * 12544; ++i) {
-        weight_file6 >> kernel_large[i];
-    }
-    weight_file6.close();  // Close the weight file after reading
-
-    // Define the kernel to be used with the linear function
-    float kernel6[10][256];
-    for (int i = 0; i < 10; ++i) {
-        for (int j = 0; j < 256; ++j) {
-		kernel6[i][j] = kernel_large[i * 12544 + j];  // Copy the first 256 elements from each row
-        }
-    }
-
-    delete[] kernel_large;  // Free the memory allocated for kernel_large
-
-    // Open and read the bias values from the classifier_bias file
-    std::ifstream bias_file6("data/classifier_bias.txt");
-    if (!bias_file6) {
-        std::cerr << "Failed to open classifier_bias.txt" << std::endl;
-        return 1;  // Return with error code
-    }
-
-    float bias6[10];
-    for (int i = 0; i < 10; ++i) {
-        bias_file6 >> bias6[i];
-    }
-    bias_file6.close();  // Close the bias file after reading
-
-//--------------------Output Arrays------------------------------//
-    // Declare output arrays
-    float conv_output1[8][8][64];
-    int conv_output_size1;
-    // Declare maxpool output arrays
-    float maxpool_output1[4][4][64];
-    int maxpool_output_size1;
-
-    // Declare output arrays
-    float conv_output2[4][4][192];
-    int conv_output_size2;
-    // Declare maxpool output arrays
-    float maxpool_output2[2][2][192];
-    int maxpool_output_size2;
-
-    // Declare output arrays
-    float conv_output3[2][2][384];
-    int conv_output_size3;
-
-    // Declare output arrays
-    float conv_output4[2][2][256];
-    int conv_output_size4;
-
-    // Declare output arrays
-    float conv_output5[2][2][256];
-    int conv_output_size5;
-
-    // Declare maxpool output arrays
-    float maxpool_output3[1][1][256];
-    int maxpool_output_size3;
-
-    // Declare view_flatten output arrays
-    float view_flatten_output[1][256];
-    int view_flatten_output_size = 1;
-
-    // Declare classifier output arrays
-    float classifier_output[10];
-    int classifier_output_size;
-
-    // Call conv2d function
-    First_conv2d(reshapedInput, 32, kernel1, bias1, 4, 5, conv_output1, conv_output_size1);
-    First_ReLU(conv_output1, conv_output_size1);
-    First_maxpool2d(conv_output1, conv_output_size1, 2, 2, maxpool_output1, maxpool_output_size1);
-    Second_conv2d(maxpool_output1, 4, kernel2, bias2, 1, 2, conv_output2, conv_output_size2);
-    Second_ReLU(conv_output2, conv_output_size2);
-    Second_maxpool2d(conv_output2, conv_output_size2, 2, 2, maxpool_output2, maxpool_output_size2);
-    Third_conv2d(maxpool_output2, 2, kernel3, bias3, 1, 1, conv_output3, conv_output_size3);
-    Third_ReLU(conv_output3, conv_output_size3);
-    Fourth_conv2d(conv_output3, 2, (const float(*)[3][384][256])kernel4, bias4, 1, 1, conv_output4, conv_output_size4);
-    Fourth_ReLU(conv_output4, conv_output_size4);
-    Fifth_conv2d(conv_output4, 2, (const float(*)[3][256][256])kernel5, bias5, 1, 1, conv_output5, conv_output_size5);
-    Fifth_ReLU(conv_output5, conv_output_size5);
-    Third_maxpool2d(conv_output5, conv_output_size5, 2, 2, maxpool_output3, maxpool_output_size3);
-    view_flatten(maxpool_output3, maxpool_output_size3, view_flatten_output, view_flatten_output_size);
-    linear(view_flatten_output, kernel6, bias6, classifier_output);
-    result(classifier_output);
 }
