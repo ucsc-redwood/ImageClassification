@@ -136,7 +136,7 @@ int main() {
     // Load the image data
     int imageDataSize = 3072;
     float* image_data = new float[imageDataSize];
-    readDataFromFile("images/flattened_image_tensor.txt", image_data, imageDataSize);
+    readDataFromFile("images/flattened_image_1.txt", image_data, imageDataSize);
 
     // Load the weights and data for the first convolutional layer
     int weightDataSize = 1728;
