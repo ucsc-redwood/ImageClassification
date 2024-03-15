@@ -305,35 +305,32 @@ int main(int argc, char** argv) {
     // Call the linear layer function
     linearLayer(flattened_output, linear_weight_data, linear_bias_data, linear_output_data, totalElements, linear_output_size);
 
-    // Print the output from the linear layer
-    std::cout << "Output after the linear layer:" << std::endl;
-    for (int i = 0; i < linear_output_size; ++i) {
-        std::cout << linear_output_data[i] << " ";
-    }
-    std::cout << std::endl;
-
-    /*
-    // Print the flattened output
-    std::cout << "Flattened output after the third max pooling:" << std::endl;
-    for (int i = 0; i < totalElements; ++i) {
-        std::cout << flattened_output[i] << " ";
-    }
-    std::cout << std::endl;
-    */
-   
-    /*
-    // Output the result after the max pooling layer
-    std::cout << "Output after the max pooling layer following the fifth convolutional layer:" << std::endl;
-    for (int c = 0; c < fifth_conv_output_channels; ++c) {
-        std::cout << "Channel " << c + 1 << ":" << std::endl;
-        for (int i = 0; i < fifth_pooled_output_height; ++i) {
-            for (int j = 0; j < fifth_pooled_output_width; ++j) {
-                std::cout << fifth_maxpool_output_data[(c * fifth_pooled_output_height + i) * fifth_pooled_output_width + j] << " ";
-            }
-            std::cout << std::endl;
+    // Find the index of the maximum element in the linear layer output
+    int max_index = 0;
+    float max_value = linear_output_data[0];
+    for (int i = 1; i < linear_output_size; ++i) {
+        if (linear_output_data[i] > max_value) {
+            max_value = linear_output_data[i];
+            max_index = i;
         }
-        std::cout << std::endl;
-    }*/
+    }
+
+    // Map the index to the corresponding class and print the prediction
+    std::cout << "Predicted Image: ";
+    switch (max_index) {
+        case 0: std::cout << "airplanes"; break;
+        case 1: std::cout << "cars"; break;
+        case 2: std::cout << "birds"; break;
+        case 3: std::cout << "cats"; break;
+        case 4: std::cout << "deer"; break;
+        case 5: std::cout << "dogs"; break;
+        case 6: std::cout << "frogs"; break;
+        case 7: std::cout << "horses"; break;
+        case 8: std::cout << "ships"; break;
+        case 9: std::cout << "trucks"; break;
+        default: std::cout << "Unknown"; break;
+    }
+    std::cout << std::endl;
 
     // Free allocated memory
     delete[] image_data;
