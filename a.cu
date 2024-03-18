@@ -341,6 +341,148 @@ int main(int argc, char** argv) {
     float* second_maxpool_output_data = new float[192 * second_pooled_output_height * second_pooled_output_width];
     cudaMemcpy(second_maxpool_output_data, d_second_maxpool_output_data, 192 * second_pooled_output_height * second_pooled_output_width * sizeof(float), cudaMemcpyDeviceToHost);
 
+    // Allocate memory for the output of the third convolutional layer on the device
+    int third_conv_output_height = second_pooled_output_height;
+    int third_conv_output_width = second_pooled_output_width;
+    float* d_third_conv_output_data;
+    cudaMalloc(&d_third_conv_output_data, 384 * third_conv_output_height * third_conv_output_width * sizeof(float));
+    
+    // Apply the third convolution
+    auto start_conv3 = std::chrono::steady_clock::now();
+    conv2d(d_second_maxpool_output_data, 192, second_pooled_output_height, second_pooled_output_width,
+                                               d_third_weight_data, 384, 192, 3, 3,
+                                               d_third_bias_data, 384, 3, 1, 1,
+                                               true, d_third_conv_output_data);
+    cudaDeviceSynchronize();
+    auto end_conv3 = std::chrono::steady_clock::now();
+    
+    // Copy the result back to the host
+    float* third_conv_output_data = new float[384 * third_conv_output_height * third_conv_output_width];
+    cudaMemcpy(third_conv_output_data, d_third_conv_output_data, 384 * third_conv_output_height * third_conv_output_width * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Allocate memory for the output of the fourth convolutional layer on the device
+    int fourth_conv_output_channels = 256;
+    int fourth_conv_output_height = third_conv_output_height;
+    int fourth_conv_output_width = third_conv_output_width;
+    float* d_fourth_conv_output_data;
+    cudaMalloc(&d_fourth_conv_output_data, fourth_conv_output_channels * fourth_conv_output_height * fourth_conv_output_width * sizeof(float));
+    
+    // Call the convolution function for the fourth layer
+    auto start_conv4 = std::chrono::steady_clock::now();
+    conv2d(d_third_conv_output_data, 384, third_conv_output_height, third_conv_output_width,
+                                               d_fourth_weight_data, fourth_conv_output_channels, 384, 3, 3,
+                                               d_fourth_bias_data, fourth_conv_output_channels, 3, 1, 1,
+                                               true, d_fourth_conv_output_data);
+    cudaDeviceSynchronize();
+    auto end_conv4 = std::chrono::steady_clock::now();
+    
+    // Copy the result back to the host
+    float* fourth_conv_output_data = new float[fourth_conv_output_channels * fourth_conv_output_height * fourth_conv_output_width];
+    cudaMemcpy(fourth_conv_output_data, d_fourth_conv_output_data, fourth_conv_output_channels * fourth_conv_output_height * fourth_conv_output_width * sizeof(float), cudaMemcpyDeviceToHost);
+    
+    // Allocate memory for the output of the fifth convolutional layer on the device
+    int fifth_conv_output_channels = 256;
+    int fifth_conv_output_height = fourth_conv_output_height;
+    int fifth_conv_output_width = fourth_conv_output_width;
+    float* d_fifth_conv_output_data;
+    cudaMalloc(&d_fifth_conv_output_data, fifth_conv_output_channels * fifth_conv_output_height * fifth_conv_output_width * sizeof(float));
+    
+    // Call the convolution function for the fifth layer
+    auto start_conv5 = std::chrono::steady_clock::now(); 
+    conv2d(d_fourth_conv_output_data, 256, fourth_conv_output_height, fourth_conv_output_width,
+                                               d_fifth_weight_data, fifth_conv_output_channels, 256, 3, 3,
+                                               d_fifth_bias_data, fifth_conv_output_channels, 3, 1, 1,
+                                               true, d_fifth_conv_output_data);
+    cudaDeviceSynchronize(); // Ensure all kernel executions are complete before proceeding
+    auto end_conv5 = std::chrono::steady_clock::now();
+    
+    // Copy the result back to the host
+    float* fifth_conv_output_data = new float[fifth_conv_output_channels * fifth_conv_output_height * fifth_conv_output_width];
+    cudaMemcpy(fifth_conv_output_data, d_fifth_conv_output_data, fifth_conv_output_channels * fifth_conv_output_height * fifth_conv_output_width * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Define parameters for the max pooling layer after the fifth convolution on the device
+    int pool_size_after_fifth = 2;
+    int pool_stride_after_fifth = 2;
+    
+    // Calculate the output dimensions for the max pooling layer
+    int fifth_pooled_output_height = (fifth_conv_output_height - pool_size_after_fifth) / pool_stride_after_fifth + 1;
+    int fifth_pooled_output_width = (fifth_conv_output_width - pool_size_after_fifth) / pool_stride_after_fifth + 1;
+    
+    // Allocate memory for the output of the max pooling layer on the device
+    float* d_fifth_maxpool_output_data;
+    cudaMalloc(&d_fifth_maxpool_output_data, fifth_conv_output_channels * fifth_pooled_output_height * fifth_pooled_output_width * sizeof(float));
+   
+    // Call the max pooling function for the fifth layer
+    auto start_maxpool3 = std::chrono::steady_clock::now();
+    maxpool2d(d_fifth_conv_output_data, fifth_conv_output_channels, fifth_conv_output_height, fifth_conv_output_width,
+                                                  pool_size_after_fifth, pool_stride_after_fifth, d_fifth_maxpool_output_data);
+    cudaDeviceSynchronize(); // Ensure all kernel executions are complete before proceeding
+    auto end_maxpool3 = std::chrono::steady_clock::now();
+    
+    // Copy the result back to the host
+    float* fifth_maxpool_output_data = new float[fifth_conv_output_channels * fifth_pooled_output_height * fifth_pooled_output_width];
+    cudaMemcpy(fifth_maxpool_output_data, d_fifth_maxpool_output_data, fifth_conv_output_channels * fifth_pooled_output_height * fifth_pooled_output_width * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // After the third max pooling layer, flatten the output
+    int totalElements = fifth_conv_output_channels * fifth_pooled_output_height * fifth_pooled_output_width;
+    float* flattened_output = new float[totalElements];
+
+    // Allocate memory for the flattened output on the device
+    float* d_flattened_output;
+    cudaMalloc(&d_flattened_output, totalElements * sizeof(float));
+    
+    // Copy flattened output data from host to device
+    cudaMemcpy(d_flattened_output, flattened_output, totalElements * sizeof(float), cudaMemcpyHostToDevice);
+    
+    // Allocate memory for the output of the linear layer on the device
+    int linear_output_size = 10;
+    float* d_linear_output_data;
+    cudaMalloc(&d_linear_output_data, linear_output_size * sizeof(float));
+  
+    // Call the linear layer function kernel
+    auto start_linear = std::chrono::steady_clock::now();
+    linearLayer(d_flattened_output, d_linear_weight_data, d_linear_bias_data, d_linear_output_data, totalElements, linear_output_size);
+    cudaDeviceSynchronize(); // Ensure all kernel executions are complete before proceeding
+    auto end_linear = std::chrono::steady_clock::now();
+    
+    // Copy the result back to the host
+    float* linear_output_data = new float[linear_output_size];
+    cudaMemcpy(linear_output_data, d_linear_output_data, linear_output_size * sizeof(float), cudaMemcpyDeviceToHost);
+
+    std::cout << "Linear layer output data:" << std::endl;
+    for (int i = 0; i < linear_output_size; ++i) {
+        std::cout << "Index " << i << ": " << linear_output_data[i] << std::endl;
+    }
+
+   
+    // Find the index of the maximum element in the linear layer output on the host
+    int max_index = 0;
+    float max_value = linear_output_data[0];
+    for (int i = 1; i < linear_output_size; ++i) {
+        if (linear_output_data[i] > max_value) {
+            max_value = linear_output_data[i];
+            max_index = i;
+        }
+    }
+    
+    std::cout << "Predicted Image: ";
+    switch (max_index) {
+        case 0: std::cout << "airplanes"; break;
+        case 1: std::cout << "cars"; break;
+        case 2: std::cout << "birds"; break;
+        case 3: std::cout << "cats"; break;
+        case 4: std::cout << "deer"; break;
+        case 5: std::cout << "dogs"; break;
+        case 6: std::cout << "frogs"; break;
+        case 7: std::cout << "horses"; break;
+        case 8: std::cout << "ships"; break;
+        case 9: std::cout << "trucks"; break;
+        default: std::cout << "Unknown"; break;
+    }
+    std::cout << " with confidence " << max_value << std::endl;
+
+
+    /*
     cudaFree(d_image_data);
     cudaFree(d_second_weight_data);
     cudaFree(d_second_weight_data);
@@ -350,6 +492,10 @@ int main(int argc, char** argv) {
     cudaFree(d_fourth_bias_data);
     cudaFree(d_linear_weight_data);
     cudaFree(d_linear_bias_data);
+    cudaFree(d_third_conv_output_data);
+    cudaFree(d_fourth_conv_output_data);
+    cudaFree(d_fifth_conv_output_data);
+    cudaFree(d_fifth_maxpool_output_data);
     delete[] h_second_weight_data;
     delete[] h_second_bias_data;
     delete[] third_h_weight_data;
@@ -358,6 +504,11 @@ int main(int argc, char** argv) {
     delete[] fourth_h_bias_data;
     delete[] linear_h_weight_data;
     delete[] linear_h_bias_data;
+    delete[] d_third_conv_output_data;
+    delete[] d_fourth_conv_output_data;
+    delete[] d_fifth_conv_output_data;
+    delete[] d_fifth_maxpool_output_data;
+    */
 
     return 0;
 }
