@@ -1,7 +1,7 @@
 #!/bin/bash
 DIRECTORY="/home/riksharm/ImageClassification/extract"
 
-CORES="0-7"  # Adjust this to set the desired cores
+CORES="0-18"  # Adjust this to set the desired cores
 
 count=0  # Initialize iteration count
 total_time_ms=0  # Initialize total time counter

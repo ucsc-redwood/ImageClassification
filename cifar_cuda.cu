@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #include <cfloat>
 
+using namespace std::chrono;
+
 void readDataFromFile(const std::string& filename, float* data, int dataSize) {
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -425,13 +427,18 @@ int main(int argc, char** argv) {
 
     // After the third max pooling layer, flatten the output
     int totalElements = fifth_conv_output_channels * fifth_pooled_output_height * fifth_pooled_output_width;
-    float* flattened_output = new float[totalElements];
-
-    // Allocate memory for the flattened output on the device
     float* d_flattened_output;
     cudaMalloc(&d_flattened_output, totalElements * sizeof(float));
-    
-    // Copy flattened output data from host to device
+    float* flattened_output = new float[totalElements];
+    for (int c = 0; c < fifth_conv_output_channels; c++) {
+        for (int h = 0; h < fifth_pooled_output_height; h++) {
+            for (int w = 0; w < fifth_pooled_output_width; w++) {
+                int flat_index = c * (fifth_pooled_output_height * fifth_pooled_output_width) + h * fifth_pooled_output_width + w;
+                int original_index = (c * fifth_pooled_output_height + h) * fifth_pooled_output_width + w;
+                flattened_output[flat_index] = fifth_maxpool_output_data[original_index];
+            }
+        }
+    }
     cudaMemcpy(d_flattened_output, flattened_output, totalElements * sizeof(float), cudaMemcpyHostToDevice);
     
     // Allocate memory for the output of the linear layer on the device
@@ -449,12 +456,6 @@ int main(int argc, char** argv) {
     float* linear_output_data = new float[linear_output_size];
     cudaMemcpy(linear_output_data, d_linear_output_data, linear_output_size * sizeof(float), cudaMemcpyDeviceToHost);
 
-    std::cout << "Linear layer output data:" << std::endl;
-    for (int i = 0; i < linear_output_size; ++i) {
-        std::cout << "Index " << i << ": " << linear_output_data[i] << std::endl;
-    }
-
-   
     // Find the index of the maximum element in the linear layer output on the host
     int max_index = 0;
     float max_value = linear_output_data[0];
@@ -479,37 +480,67 @@ int main(int argc, char** argv) {
         case 9: std::cout << "trucks"; break;
         default: std::cout << "Unknown"; break;
     }
-    std::cout << " with confidence " << max_value << std::endl;
+    std::cout << std::endl;
 
+    double total_time_ms = 0.0;
+    total_time_ms += duration_cast<milliseconds>(end_conv1 - start_conv1).count();
+    total_time_ms += duration_cast<microseconds>(end_maxpool1 - start_maxpool1).count() / 1000.0;
+    total_time_ms += duration_cast<milliseconds>(end_conv2 - start_conv2).count();
+    total_time_ms += duration_cast<microseconds>(end_maxpool2 - start_maxpool2).count() / 1000.0;
+    total_time_ms += duration_cast<milliseconds>(end_conv3 - start_conv3).count();
+    total_time_ms += duration_cast<milliseconds>(end_conv4 - start_conv4).count();
+    total_time_ms += duration_cast<milliseconds>(end_conv5 - start_conv5).count();
+    total_time_ms += duration_cast<microseconds>(end_maxpool3 - start_maxpool3).count() / 1000.0;
+    total_time_ms += duration_cast<microseconds>(end_linear - start_linear).count() / 1000.0;
+    
+    std::cout << "Total time: " << total_time_ms << " ms" << std::endl;
 
-    /*
+    // Free device memory
     cudaFree(d_image_data);
+    cudaFree(d_weight_data);
+    cudaFree(d_bias_data);
     cudaFree(d_second_weight_data);
-    cudaFree(d_second_weight_data);
+    cudaFree(d_second_bias_data);
     cudaFree(d_third_weight_data);
     cudaFree(d_third_bias_data);
     cudaFree(d_fourth_weight_data);
     cudaFree(d_fourth_bias_data);
+    cudaFree(d_fifth_weight_data);
+    cudaFree(d_fifth_bias_data);
     cudaFree(d_linear_weight_data);
     cudaFree(d_linear_bias_data);
+    cudaFree(d_conv_output_data);
+    cudaFree(d_maxpool_output_data);
+    cudaFree(d_second_conv_output_data);
+    cudaFree(d_second_maxpool_output_data);
     cudaFree(d_third_conv_output_data);
     cudaFree(d_fourth_conv_output_data);
     cudaFree(d_fifth_conv_output_data);
     cudaFree(d_fifth_maxpool_output_data);
+    cudaFree(d_flattened_output);
+    cudaFree(d_linear_output_data);
+
+    // Free host memory
+    delete[] h_image_data;
+    delete[] h_weight_data;
+    delete[] h_bias_data;
     delete[] h_second_weight_data;
     delete[] h_second_bias_data;
     delete[] third_h_weight_data;
     delete[] third_h_bias_data;
     delete[] fourth_h_weight_data;
     delete[] fourth_h_bias_data;
+    delete[] fifth_h_weight_data;
+    delete[] fifth_h_bias_data;
     delete[] linear_h_weight_data;
     delete[] linear_h_bias_data;
-    delete[] d_third_conv_output_data;
-    delete[] d_fourth_conv_output_data;
-    delete[] d_fifth_conv_output_data;
-    delete[] d_fifth_maxpool_output_data;
-    */
-
+    delete[] second_conv_output_data;
+    delete[] second_maxpool_output_data;
+    delete[] third_conv_output_data;
+    delete[] fourth_conv_output_data;
+    delete[] fifth_conv_output_data;
+    delete[] fifth_maxpool_output_data;
+    delete[] flattened_output;
+    delete[] linear_output_data;
     return 0;
 }
-
