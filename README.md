@@ -1,5 +1,6 @@
 # Heterogeneous image classification
 
+</small>
 ## Image Classification Results for Cifar10 CUDA
 
 | File                                   | File Count | Predicted Image | Total Time (ms) | Total Time Taken Up to Now (ms) |
@@ -30,7 +31,50 @@ Total CUDA execution time: 792.003 milliseconds
 
 Total C++ and OpenMP execution time: 149016.286 milliseconds
 
+### Epoch Results for Cifar10
 
+| Epoch | Loss   | Accuracy |
+|-------|--------|----------|
+| 1     | 1.5192 | 44.13%   |
+| 2     | 1.0281 | 63.49%   |
+| 3     | 0.8128 | 71.29%   |
+| 4     | 0.6679 | 76.87%   |
+| 5     | 0.5501 | 80.66%   |
+
+The sparsity of weight and bias:
+
+| File                    | Sparsity |
+|-------------------------|----------|
+| features_0_weight.txt   | 0.00     |
+| features_3_weight.txt   | 0.00     |
+| features_6_weight.txt   | 0.00     |
+| features_8_weight.txt   | 0.00     |
+| features_10_weight.txt  | 0.00     |
+| classifier_weight.txt   | 0.00     |
+
+
+## Epoch Results for Cifar10 99% Pruned
+
+| Epoch | Loss   | Accuracy |
+|-------|--------|----------|
+| 1     | 1.5269 | 44.38%   |
+| 2     | 1.0893 | 61.34%   |
+| 3     | 0.9069 | 68.28%   |
+| 4     | 0.7697 | 73.07%   |
+| 5     | 0.6670 | 76.77%   |
+
+The Sparsity of weight and bias:
+
+| File                    | Sparsity |
+|-------------------------|----------|
+| features_0_weight.txt   | 0.42     |
+| features_3_weight.txt   | 0.73     |
+| features_6_weight.txt   | 0.76     |
+| features_8_weight.txt   | 0.75     |
+| features_10_weight.txt  | 0.71     |
+| classifier_weight.txt   | 0.34     |
+
+</small>
 ## Structure of Alexnet Cifar-10
 ```python
 
