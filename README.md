@@ -1,4 +1,19 @@
-# ImageClassification
+# Heterogeneous image classification
+
+## Image Classification Results for Cifar10 CUDA
+
+| File                                   | File Count | Predicted Image | Total Time (ms) | Total Time Taken Up to Now (ms) |
+|----------------------------------------|------------|-----------------|-----------------|---------------------------------|
+| flattened_airplane_airplane_100.txt    | 1          | airplanes       | 0.205           | 0.205                           |
+| flattened_airplane_airplane_101.txt    | 2          | airplanes       | 0.384           | 0.589                           |
+| flattened_airplane_airplane_102.txt    | 3          | airplanes       | 0.365           | 0.954                           |
+| flattened_airplane_airplane_103.txt    | 4          | airplanes       | 0.382           | 1.336                           |
+| flattened_airplane_airplane_104.txt    | 5          | airplanes       | 0.732           | 2.068                           |
+| flattened_airplane_airplane_105.txt    | 6          | airplanes       | 0.706           | 2.774                           |
+| *** ... ***                            | ***        | ***             | ***             | ***                             |
+| flattened_truck_truck_9.txt            | 1154       | trucks          | 0.37            | 792.003                         |
+
+Total CUDA execution time: 792.003 milliseconds
 
 ## Structure of Alexnet Cifar-10
 ```python
