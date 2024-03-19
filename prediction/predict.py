@@ -29,23 +29,10 @@ class AlexNet(nn.Module):
         self.classifier = nn.Linear(256 * 4 * 4, num_classes)  # Assuming two max pool layers reducing size to 4x4
 
     def forward(self, x):
-        relu_output = self.features[0](x)
-        x = self.features[0](x)
-        x = self.features[1](x)
-        x = self.features[2](x)  # First Convolutional + ReLU + MaxPool
-
-        # Process through second layers
-        x = self.features[3](x)
-        x = self.features[4](x)
-        x = self.features[5](x)  # Second Convolutional + ReLU + MaxPool
-
-        # Continue with the rest of the layers
-        for i in range(6, len(self.features)):
-            x = self.features[i](x)
-
+        x = self.features(x)
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
-        return x, relu_output
+        return x
 
 
 # Define transformations for input image
@@ -57,7 +44,7 @@ transform = transforms.Compose([
 
 # Load the trained model
 model = AlexNet()
-model.load_state_dict(torch.load('alexnet_cifar10.pth'))
+model.load_state_dict(torch.load('../train/alexnet_cifar10.pth'))
 model.eval()  # Set model to evaluation mode
 
 # Function to predict class label for a single image
@@ -65,15 +52,11 @@ def predict_image(image_path):
     image = Image.open(image_path)
     image_tensor = transform(image).unsqueeze(0)  # Add batch dimension
     with torch.no_grad():  # Disable gradient computation for inference
-        output, relu_output = model(image_tensor)
+        output = model(image_tensor)
         _, predicted = output.max(1)
-        return predicted.item(), relu_output
+        return predicted.item()
 
 # Example usage
-image_path = 'image_2.png'  # Path to your image
-predicted_class, relu_output = predict_image(image_path)
+image_path = '../images/image_2.png'  # Path to your image
+predicted_class = predict_image(image_path)
 print(f'Predicted class: {predicted_class}')
-
-# Print the output after the first convolution and ReLU layer
-print('Output after first conv and ReLU:', relu_output)
-
