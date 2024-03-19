@@ -75,6 +75,7 @@ The Sparsity of weight and bias:
 | classifier_weight.txt   | 0.34     |
 
 </small>
+
 ## Structure of Alexnet Cifar-10
 ```python
 
