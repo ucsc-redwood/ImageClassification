@@ -15,6 +15,22 @@
 
 Total CUDA execution time: 792.003 milliseconds
 
+## Image Classification Results for Cifar10 C++ and OpenMP
+
+| File                                   | File Count | Predicted Image | Total Time (ms) | Total Time Taken Up to Now (ms) |
+|----------------------------------------|------------|-----------------|-----------------|---------------------------------|
+| flattened_airplane_airplane_100.txt    | 1          | airplanes       | 197.695         | 197.695                         |
+| flattened_airplane_airplane_101.txt    | 2          | airplanes       | 52.109          | 249.804                         |
+| flattened_airplane_airplane_102.txt    | 3          | airplanes       | 213.931         | 463.735                         |
+| flattened_airplane_airplane_103.txt    | 4          | airplanes       | 63.163          | 526.898                         |
+| flattened_airplane_airplane_104.txt    | 5          | airplanes       | 75.58           | 602.478                         |
+| flattened_airplane_airplane_105.txt    | 6          | airplanes       | 195.106         | 797.584                         |
+| *** ... ***                            | ***        | ***             | ***             | ***                             |
+| flattened_truck_truck_9.txt            | 1154       | trucks          | 52.116          | 149016.286                      |
+
+Total C++ and OpenMP execution time: 149016.286 milliseconds
+
+
 ## Structure of Alexnet Cifar-10
 ```python
 
