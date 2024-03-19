@@ -1,7 +1,6 @@
 # Heterogeneous image classification
 
-</small>
-## Image Classification Results for Cifar10 CUDA
+Image Classification Results for Cifar10 CUDA
 
 | File                                   | File Count | Predicted Image | Total Time (ms) | Total Time Taken Up to Now (ms) |
 |----------------------------------------|------------|-----------------|-----------------|---------------------------------|
@@ -16,7 +15,7 @@
 
 Total CUDA execution time: 792.003 milliseconds
 
-## Image Classification Results for Cifar10 C++ and OpenMP
+Image Classification Results for Cifar10 C++ and OpenMP
 
 | File                                   | File Count | Predicted Image | Total Time (ms) | Total Time Taken Up to Now (ms) |
 |----------------------------------------|------------|-----------------|-----------------|---------------------------------|
@@ -31,7 +30,7 @@ Total CUDA execution time: 792.003 milliseconds
 
 Total C++ and OpenMP execution time: 149016.286 milliseconds
 
-### Epoch Results for Cifar10
+Epoch Results for Cifar10
 
 | Epoch | Loss   | Accuracy |
 |-------|--------|----------|
@@ -53,7 +52,7 @@ The sparsity of weight and bias:
 | classifier_weight.txt   | 0.00     |
 
 
-## Epoch Results for Cifar10 99% Pruned
+Epoch Results for Cifar10 99% Pruned
 
 | Epoch | Loss   | Accuracy |
 |-------|--------|----------|
@@ -73,8 +72,6 @@ The Sparsity of weight and bias:
 | features_8_weight.txt   | 0.75     |
 | features_10_weight.txt  | 0.71     |
 | classifier_weight.txt   | 0.34     |
-
-</small>
 
 ## Structure of Alexnet Cifar-10
 ```python
