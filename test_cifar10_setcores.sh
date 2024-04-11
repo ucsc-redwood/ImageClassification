@@ -1,6 +1,7 @@
 #!/bin/bash
 DIRECTORY="/home/riksharm/ImageClassification/extract"
 
+# thread pining - 
 CORES="0-18"  # Adjust this to set the desired cores
 
 count=0  # Initialize iteration count

@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <cfloat>
 
+//no block idx, idy, flattend thread array, 2d table, 1d struct for threads.
 using namespace std::chrono;
 
 void readDataFromFile(const std::string& filename, float* data, int dataSize) {
@@ -64,7 +65,7 @@ void maxpool2d(float* input_data, int input_channels, int input_height, int inpu
     maxpool2d_kernel<<<numBlocks, threadsPerBlock>>>(input_data, input_channels, input_height, input_width,
                                                      pool_size, stride, output_data);
 }
-
+//adaptable for number of blocks, threads128 parameter-maybe
 __global__ void conv2d_kernel(float* input_data, int image_input_channels, int input_height, int input_width,
                               float* weight_data, int weight_output_channels, int weight_input_channels, int weight_height, int weight_width,
                               float* bias_data, int bias_number_of_elements, int kernel_size, int stride, int padding,
